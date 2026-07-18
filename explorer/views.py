@@ -5,6 +5,8 @@ from django.forms import model_to_dict
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 
 from rest_framework import viewsets, permissions, mixins
 from rest_framework.decorators import action
@@ -177,6 +179,7 @@ class IndexView(APIView):
     template_name = 'explorer/index.html'
     permission_classes = [permissions.AllowAny]
 
+    @method_decorator(cache_page(5))
     def get(self, request):
         # TODO: Whenever multi-version is ready, show em all
         decompilers = sorted(Decompiler.healthy_latest_versions().values(), key=lambda d: d.name.lower())
