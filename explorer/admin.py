@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.db.models.query import QuerySet
+from django.http import HttpRequest
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 
@@ -13,6 +15,10 @@ class DecompilationRequestAdmin(admin.ModelAdmin):
 	ordering = ('-created', 'decompiler')
 	list_display = ('created', 'decompiler', '_binary', 'last_attempted', 'id')
 	raw_id_fields = ('binary',)
+	search_fields = ('id', 'binary__id')
+
+	def get_queryset(self, request: HttpRequest) -> QuerySet:
+		return super().get_queryset(request).select_related("binary", "decompiler")
 
 	def _binary(self, instance):
 		return mark_safe(f'<a href="/?id={instance.binary.id}">{instance.binary.id}</a>')
@@ -21,9 +27,12 @@ class DecompilationRequestAdmin(admin.ModelAdmin):
 @admin.register(Decompilation)
 class DecompilationAdmin(admin.ModelAdmin):
 	model = Decompilation
-	ordering = ('-created', 'decompiler')
 	list_display = ('created', 'decompiler', '_binary', '_succeeded', 'id')
 	raw_id_fields = ('binary',)
+	search_fields = ('id', 'binary__id')
+
+	def get_queryset(self, request: HttpRequest) -> QuerySet:
+		return super().get_queryset(request).select_related("binary", "decompiler")
 
 	def _binary(self, instance):
 		return mark_safe(f'<a href="/?id={instance.binary.id}">{instance.binary.id}</a>')
