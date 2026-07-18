@@ -140,7 +140,7 @@ class DecompilationViewSet(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, m
 
     def get_queryset(self):
         binary = self.get_binary()
-        queryset = Decompilation.objects.filter(binary=binary)
+        queryset = Decompilation.objects.filter(binary=binary).select_related("binary", "decompiler")
         return queryset
 
     @action(methods=['GET'], detail=True)
