@@ -85,7 +85,7 @@ class RunnerWrapper:
         self.session.headers.update({'X-AUTH-TOKEN': AUTH_TOKEN})
 
         self.decompiler_id = self.register_runner()
-        self.pending_url = f'{SERVER}/api/decompilation_requests/?decompiler={self.decompiler_id}'
+        self.claim_url = f'{SERVER}/api/decompilation_requests/claim/'
         self.health_check_url = f'{SERVER}/api/decompilers/{self.decompiler_id}/health_check/'
 
         self.logger.info(f"   REMOTE ID: {self.decompiler_id}")
@@ -145,42 +145,49 @@ class RunnerWrapper:
 
         while True:
             try:
-                req = self.session.get(self.pending_url).json()
+                resp = self.session.post(self.claim_url, json={"decompiler": self.decompiler_id})
 
-                for pending_req in req['results'][:1]:
-                    self.logger.info(f"Got decompilation request for {pending_req['binary_id']} (req: {pending_req['id']})")
-                    self.logger.debug(f"<<< %s", pending_req)
-                    compiled_conts = self.session.get(pending_req['download_url']).content
-                    self.logger.debug("Starting decompilation")
-                    start_time = time.time()
-                    try:
-                        decompiled = self.decompile_source(pending_req, self.args, compiled_conts)
-                        end_time = time.time()
-                        self.logger.debug("Decompilation finished")
+                if resp.status_code == 204:
+                    # Nothing for us to do
+                    time.sleep(1)
+                    continue
 
-                        data = {
-                            'analysis_time': end_time - start_time,
-                        }
-                        files = {
-                            'decompiled_file': decompiled,
-                        }
+                resp.raise_for_status()
+                pending_req = resp.json()
 
-                        r = self.session.post(pending_req['completion_url'], data=data, files=files)
+                self.logger.info(f"Got decompilation request for {pending_req['binary_id']} (req: {pending_req['id']})")
+                self.logger.debug("<<< %s", pending_req)
+                compiled_conts = self.session.get(pending_req['download_url']).content
+                self.logger.debug("Starting decompilation")
+                start_time = time.time()
+                try:
+                    decompiled = self.decompile_source(pending_req, self.args, compiled_conts)
+                    end_time = time.time()
+                    self.logger.debug("Decompilation finished")
 
-                        self.logger.debug(">>> %s", r.text)
-                        self.logger.info(f"Decompilation request for {pending_req['binary_id']} (req: {pending_req['id']}) finished with success")
-                    except DecompileError as e:
-                        err_msg = e.message.strip().replace("\x00", "")
-                        end_time = time.time()
-                        self.logger.error(f"DECOMPILE ERROR: {err_msg}")
-                        data = {
-                            'error': err_msg or 'No details provided',
-                            'analysis_time': end_time - start_time,
-                        }
-                        r = self.session.post(pending_req['completion_url'], data=data)
-                        if r.status_code != 200:
-                            self.logger.error(f"Failed submitting data: {r.text}")
-                        self.logger.debug(r.text)
+                    data = {
+                        'analysis_time': end_time - start_time,
+                    }
+                    files = {
+                        'decompiled_file': decompiled,
+                    }
+
+                    r = self.session.post(pending_req['completion_url'], data=data, files=files)
+
+                    self.logger.debug(">>> %s", r.text)
+                    self.logger.info(f"Decompilation request for {pending_req['binary_id']} (req: {pending_req['id']}) finished with success")
+                except DecompileError as e:
+                    err_msg = e.message.strip().replace("\x00", "")
+                    end_time = time.time()
+                    self.logger.error(f"DECOMPILE ERROR: {err_msg}")
+                    data = {
+                        'error': err_msg or 'No details provided',
+                        'analysis_time': end_time - start_time,
+                    }
+                    r = self.session.post(pending_req['completion_url'], data=data)
+                    if r.status_code != 200:
+                        self.logger.error(f"Failed submitting data: {r.text}")
+                    self.logger.debug(r.text)
 
             except KeyboardInterrupt:
                 break

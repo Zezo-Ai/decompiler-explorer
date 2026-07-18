@@ -1,6 +1,7 @@
 import datetime
 from logging import getLogger
 
+from django.db import transaction
 from django.forms import model_to_dict
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
@@ -27,24 +28,43 @@ logger = getLogger('django')
 class DecompilationRequestViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = DecompilationRequestSerializer
     permission_classes = [IsWorkerOrAdmin]
+    queryset = DecompilationRequest.objects.select_related("binary", "decompiler")
 
-    def get_queryset(self):
-        queryset = DecompilationRequest.objects.all()
-
-        decompiler_id = self.request.query_params.get('decompiler')
-        if decompiler_id is not None:
-            queryset = queryset.filter(
-                decompiler__id=decompiler_id,
-                last_attempted__lt=timezone.now() - datetime.timedelta(seconds=300)
+    @action(methods=["POST"], detail=False)
+    def claim(self, request):
+        decompiler_id = request.data.get("decompiler")
+        if not decompiler_id:
+            return Response(
+                {"decompiler": ["This field is required."]},
+                status=400,
             )
-            earliest = queryset.first()
-            if earliest is not None:
-                logger.debug(f"Giving request %s to %s", earliest, self.request.META['REMOTE_ADDR'])
-                earliest.last_attempted = timezone.now()
-                earliest.save(update_fields=['last_attempted'])
-                return [earliest]
 
-        return queryset
+        now = timezone.now()
+        retry_cutoff = now - datetime.timedelta(seconds=300)
+
+        with transaction.atomic():
+            earliest_req = (
+                DecompilationRequest.objects
+                .select_for_update(skip_locked=True) # If another worker is already claiming this then move on
+                .select_related("binary", "decompiler")
+                .filter(decompiler_id=decompiler_id, last_attempted__lt=retry_cutoff)
+                .order_by("created")
+                .first()
+            )
+
+            if earliest_req is None:
+                return Response(status=204)
+
+            earliest_req.last_attempted = now
+            earliest_req.save(update_fields=["last_attempted"])
+
+        logger.debug(
+            "Giving request %s to %s",
+            earliest_req,
+            request.META.get("REMOTE_ADDR"),
+        )
+        return Response(self.get_serializer(earliest_req).data)
+
 
     @action(methods=['POST'], detail=True)
     def complete(self, request, pk=None):
