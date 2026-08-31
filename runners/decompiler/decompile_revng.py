@@ -17,7 +17,7 @@ def main():
     infile.flush()
 
     ptml_path = cwd / 'output.ptml'
-    decomp = subprocess.run([REVNG_CLI, "artifact", "decompile-to-single-file", "--analyze", infile.name, "-o", str(ptml_path)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+    decomp = subprocess.run([REVNG_CLI, "artifact", "emit-c-as-single-file", "--analyze", infile.name, "-o", str(ptml_path)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
     if decomp.returncode != 0:
         print(f'{decomp.stdout.decode()}\n{decomp.stderr.decode()}')
         return
