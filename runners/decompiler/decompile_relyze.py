@@ -6,21 +6,23 @@ from pathlib import Path
 
 RELYZE_INSTALL = Path(os.getenv("RELYZE_INSTALL_PATH", "/home/decompiler_user/RelyzeDesktop/app"))
 RELYZE_CLI     = RELYZE_INSTALL / 'RelyzeCLI.exe'
+RELYZE_PLUGIN  = Path(__file__).resolve().parent / 'decompiler_explorer.rb'
 
 def relyze_cli_run(params):
     if not RELYZE_CLI.is_file():
         return False, f'\'{RELYZE_CLI.name}\' not found.'
 
-    logfile = Path('log.tmp')
+    cwd = Path.cwd()
+    logfile = cwd / 'log.tmp'
 
-    cli = subprocess.run(['wine64', str(RELYZE_CLI), '/output', logfile.name] + params, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    cli = subprocess.run(['wine64', str(RELYZE_CLI), '/output', logfile.name] + params, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, cwd=cwd)
 
     logdata = ''
 
     if logfile.is_file():
-        with open(logfile.name, 'r', encoding='utf-16-le') as f:
+        with open(logfile, 'r', encoding='utf-16-le') as f:
             logdata = f.read()
-        os.remove(logfile.name)
+        logfile.unlink()
 
     if cli.returncode != 0:
         return False, f'{logdata}\n{cli.stdout.decode()}'
@@ -29,10 +31,11 @@ def relyze_cli_run(params):
 
 def main():
 
-    infile  = Path('in.tmp')
-    outfile = Path('out.tmp')
+    cwd = Path.cwd()
+    infile  = cwd / 'in.tmp'
+    outfile = cwd / 'out.tmp'
 
-    with open(infile.name, 'wb') as f:
+    with open(infile, 'wb') as f:
         f.write(sys.stdin.buffer.read())
 
     func_timeout = int(os.getenv('DECOMPILER_FUNC_TIMEOUT', 15))
@@ -40,22 +43,23 @@ def main():
     success, res = relyze_cli_run([
         '/run',
         '/plugin',
-        'decompiler_explorer.rb',
+        str(RELYZE_PLUGIN),
         '/plugin_commandline',
         f'/in={infile.name} /out={outfile.name} /func_timeout={func_timeout}'
     ])
 
-    os.remove(infile.name)
+    infile.unlink()
 
     if not success:
         print(res)
-        os.remove(outfile.name)
+        if outfile.is_file():
+            outfile.unlink()
         return 1
 
     if outfile.is_file():
-        with open(outfile.name, 'r') as f:
+        with open(outfile, 'r') as f:
             print(f.read())
-        os.remove(outfile.name)
+        outfile.unlink()
     else:
         print('no output file.')
         return 1

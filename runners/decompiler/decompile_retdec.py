@@ -1,5 +1,4 @@
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -11,22 +10,22 @@ RETDEC_DECOMPILER = RETDEC_INSTALL / 'retdec-decompiler'
 
 
 def main():
-    with tempfile.TemporaryDirectory() as tempdir:
-        conts = sys.stdin.buffer.read()
-        infile = tempfile.NamedTemporaryFile(dir=tempdir, delete=False)
-        infile.write(conts)
-        infile.flush()
-        outfile = tempfile.NamedTemporaryFile(dir=tempdir, delete=False)
-        outfile.close()
+    cwd = Path.cwd()
+    conts = sys.stdin.buffer.read()
+    infile = tempfile.NamedTemporaryFile(dir=cwd, delete=False)
+    infile.write(conts)
+    infile.flush()
+    outfile = tempfile.NamedTemporaryFile(dir=cwd, delete=False)
+    outfile.close()
 
-        decomp = subprocess.run([RETDEC_DECOMPILER, '--output', outfile.name, '--cleanup', '--silent', infile.name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if decomp.returncode != 0:
-            print(f'{decomp.stdout.decode()}\n{decomp.stderr.decode()}')
-            return
-        infile.close()
+    decomp = subprocess.run([RETDEC_DECOMPILER, '--output', outfile.name, '--cleanup', '--silent', infile.name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+    if decomp.returncode != 0:
+        print(f'{decomp.stdout.decode()}\n{decomp.stderr.decode()}')
+        return
+    infile.close()
 
-        with open(outfile.name, 'rb') as f:
-            sys.stdout.buffer.write(f.read())
+    with open(outfile.name, 'rb') as f:
+        sys.stdout.buffer.write(f.read())
 
 
 def version():

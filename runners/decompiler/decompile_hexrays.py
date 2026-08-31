@@ -1,5 +1,4 @@
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -12,21 +11,21 @@ IDA_VERSION_PY = IDA_INSTALL / 'version.py'
 
 
 def main():
-    with tempfile.TemporaryDirectory() as tempdir:
-        conts = sys.stdin.buffer.read()
-        infile = tempfile.NamedTemporaryFile(dir=tempdir, delete=False)
-        infile.write(conts)
-        infile.flush()
-        output = infile.name + ".c"
+    cwd = Path.cwd()
+    conts = sys.stdin.buffer.read()
+    infile = tempfile.NamedTemporaryFile(dir=cwd, delete=False)
+    infile.write(conts)
+    infile.flush()
+    output = infile.name + ".c"
 
-        decomp = subprocess.run([sys.executable, str(IDA_BATCH_PY), "--idadir", str(IDA_INSTALL), infile.name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if decomp.returncode != 0 or not Path(output).exists():
-            print(f'{decomp.stdout.decode()}\n{decomp.stderr.decode()}')
-            return
-        infile.close()
+    decomp = subprocess.run([sys.executable, str(IDA_BATCH_PY), "--idadir", str(IDA_INSTALL), infile.name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+    if decomp.returncode != 0 or not Path(output).exists():
+        print(f'{decomp.stdout.decode()}\n{decomp.stderr.decode()}')
+        return
+    infile.close()
 
-        with open(output, 'rb') as f:
-            sys.stdout.buffer.write(f.read())
+    with open(output, 'rb') as f:
+        sys.stdout.buffer.write(f.read())
 
 
 def version():

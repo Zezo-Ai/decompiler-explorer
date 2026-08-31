@@ -2,6 +2,7 @@ import html
 import os
 import sys
 import tempfile
+from pathlib import Path
 
 import binaryninja
 from binaryninja import lineardisassembly
@@ -10,7 +11,7 @@ from binaryninja.enums import DisassemblyOption, LinearDisassemblyLineType, Inst
 
 
 def main():
-    t = tempfile.NamedTemporaryFile()
+    t = tempfile.NamedTemporaryFile(dir=Path.cwd())
     t.write(sys.stdin.buffer.read())
     t.flush()
 

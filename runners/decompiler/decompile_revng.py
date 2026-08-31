@@ -1,5 +1,4 @@
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -11,28 +10,28 @@ REVNG_CLI = REVNG_INSTALL / 'revng'
 
 
 def main():
-    with tempfile.TemporaryDirectory() as tempdir:
-        conts = sys.stdin.buffer.read()
-        infile = tempfile.NamedTemporaryFile(dir=tempdir, delete=False)
-        infile.write(conts)
-        infile.flush()
+    cwd = Path.cwd()
+    conts = sys.stdin.buffer.read()
+    infile = tempfile.NamedTemporaryFile(dir=cwd, delete=False)
+    infile.write(conts)
+    infile.flush()
 
-        ptml_path = Path(tempdir) / 'output.ptml'
-        decomp = subprocess.run([REVNG_CLI, "artifact", "decompile-to-single-file", "--analyze", infile.name, "-o", str(ptml_path)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=tempdir)
-        if decomp.returncode != 0:
-            print(f'{decomp.stdout.decode()}\n{decomp.stderr.decode()}')
-            return
+    ptml_path = cwd / 'output.ptml'
+    decomp = subprocess.run([REVNG_CLI, "artifact", "decompile-to-single-file", "--analyze", infile.name, "-o", str(ptml_path)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+    if decomp.returncode != 0:
+        print(f'{decomp.stdout.decode()}\n{decomp.stderr.decode()}')
+        return
 
-        infile.close()
+    infile.close()
 
-        c_path = Path(tempdir) / 'output.c'
-        parse = subprocess.run([REVNG_CLI, "ptml", "-p", "-o", str(c_path), str(ptml_path)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=tempdir)
-        if parse.returncode != 0:
-            print(f'{parse.stdout.decode()}\n{parse.stderr.decode()}')
-            return
+    c_path = cwd / 'output.c'
+    parse = subprocess.run([REVNG_CLI, "ptml", "-p", "-o", str(c_path), str(ptml_path)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+    if parse.returncode != 0:
+        print(f'{parse.stdout.decode()}\n{parse.stderr.decode()}')
+        return
 
-        with open(c_path, "rb") as f:
-            sys.stdout.buffer.write(f.read())
+    with open(c_path, "rb") as f:
+        sys.stdout.buffer.write(f.read())
 
 
 def version():

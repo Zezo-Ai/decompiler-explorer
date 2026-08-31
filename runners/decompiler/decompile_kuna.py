@@ -1,5 +1,4 @@
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -11,19 +10,19 @@ KUNA_BIN = KUNA_INSTALL / 'kuna'
 
 
 def main():
-    with tempfile.TemporaryDirectory() as tempdir:
-        conts = sys.stdin.buffer.read()
-        infile = tempfile.NamedTemporaryFile(dir=tempdir, delete=False)
-        infile.write(conts)
-        infile.flush()
+    cwd = Path.cwd()
+    conts = sys.stdin.buffer.read()
+    infile = tempfile.NamedTemporaryFile(dir=cwd, delete=False)
+    infile.write(conts)
+    infile.flush()
 
-        decomp = subprocess.run([KUNA_BIN, 'decompile-all', infile.name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=KUNA_INSTALL)
-        if decomp.returncode != 0:
-            print(f'{decomp.stdout.decode()}\n{decomp.stderr.decode()}')
-            return
-        infile.close()
+    decomp = subprocess.run([KUNA_BIN, 'decompile-all', infile.name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=KUNA_INSTALL)
+    if decomp.returncode != 0:
+        print(f'{decomp.stdout.decode()}\n{decomp.stderr.decode()}')
+        return
+    infile.close()
 
-        sys.stdout.buffer.write(decomp.stdout)
+    sys.stdout.buffer.write(decomp.stdout)
 
 
 def version():

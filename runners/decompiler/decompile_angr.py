@@ -1,5 +1,6 @@
 import sys
 import tempfile
+from pathlib import Path
 from typing import List
 
 import angr
@@ -11,7 +12,7 @@ warnings.filterwarnings('ignore')
 
 def decompile():
     conts = sys.stdin.buffer.read()
-    t = tempfile.NamedTemporaryFile()
+    t = tempfile.NamedTemporaryFile(dir=Path.cwd())
     t.write(conts)
     t.flush()
 

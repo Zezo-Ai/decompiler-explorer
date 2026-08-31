@@ -6,6 +6,7 @@ import os
 import resource
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import traceback
@@ -46,9 +47,11 @@ class RunnerWrapper:
         if os.getenv('DEBUG', '0') == '1':
             self.args.debug = True
 
-        DECOMPILER_NAME = subprocess.check_output([sys.executable, self.args.script_name, '--name']).strip().decode()
-        DECOMPILER_URL = subprocess.check_output([sys.executable, self.args.script_name, '--url']).strip().decode()
-        version = subprocess.check_output([sys.executable, self.args.script_name, '--version']).decode()
+        self.script_path = os.path.abspath(self.args.script_name)
+
+        DECOMPILER_NAME = subprocess.check_output([sys.executable, self.script_path, '--name']).strip().decode()
+        DECOMPILER_URL = subprocess.check_output([sys.executable, self.script_path, '--url']).strip().decode()
+        version = subprocess.check_output([sys.executable, self.script_path, '--version']).decode()
         DECOMPILER_VERSION = version.split('\n')[0].strip()
         DECOMPILER_REVISION = version.split('\n')[1].strip()
 
@@ -207,18 +210,22 @@ class RunnerWrapper:
         try:
             # Use the shell's job monitor to cleanup children for us
             # https://stackoverflow.com/a/4054436
-            child_proc = shlex.join([sys.executable, args.script_name])
+            child_proc = shlex.join([sys.executable, self.script_path])
 
             timeout = args.timeout
             if req['extend_timeout']:
                 timeout = args.extended_timeout
 
-            bash_timeout = timeout + 10
-            bash_cmd = f'set -o monitor ; timeout -s 9 {bash_timeout} {child_proc} < /dev/stdin'
+            if timeout is None:
+                bash_cmd = f'set -o monitor ; {child_proc} < /dev/stdin'
+            else:
+                bash_timeout = timeout + 10
+                bash_cmd = f'set -o monitor ; timeout -s 9 {bash_timeout} {child_proc} < /dev/stdin'
             self.logger.debug(bash_cmd)
-            proc = subprocess.run(['/bin/bash', '-c', bash_cmd], input=compiled,
-                                  capture_output=True, timeout=timeout,
-                                  preexec_fn=lambda: set_limits(args.mem_limit_soft, args.mem_limit_hard))
+            with tempfile.TemporaryDirectory() as tempdir:
+                proc = subprocess.run(['/bin/bash', '-c', bash_cmd], input=compiled,
+                                      capture_output=True, timeout=timeout, cwd=tempdir,
+                                      preexec_fn=lambda: set_limits(args.mem_limit_soft, args.mem_limit_hard))
         except subprocess.TimeoutExpired:
             raise DecompileError("Exceeded time limit")
 

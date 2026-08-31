@@ -1,5 +1,4 @@
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -11,25 +10,26 @@ DEWOLF_DECOMPILE_PY = DEWOLF_INSTALL / 'decompile.py'
 
 
 def main():
-    with tempfile.TemporaryDirectory() as tempdir:
-        conts = sys.stdin.buffer.read()
-        infile = tempfile.NamedTemporaryFile(dir=tempdir, delete=False)
-        infile.write(conts)
-        infile.flush()
+    cwd = Path.cwd()
+    conts = sys.stdin.buffer.read()
+    infile = tempfile.NamedTemporaryFile(dir=cwd, delete=False)
+    infile.write(conts)
+    infile.flush()
 
-        os.mkdir(tempdir + '/output')
-        outfile = tempfile.NamedTemporaryFile(dir=tempdir + '/output', delete=False)
-        outfile.close()
+    output_dir = cwd / 'output'
+    output_dir.mkdir()
+    outfile = tempfile.NamedTemporaryFile(dir=output_dir, delete=False)
+    outfile.close()
 
-        decomp = subprocess.run(['pipenv', 'run', 'python', DEWOLF_DECOMPILE_PY, '-o', outfile.name, infile.name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=str(DEWOLF_INSTALL))
-        if decomp.returncode != 0:
-            print(f'{decomp.stdout.decode()}\n{decomp.stderr.decode()}')
-            return
+    decomp = subprocess.run(['pipenv', 'run', 'python', DEWOLF_DECOMPILE_PY, '-o', outfile.name, infile.name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=str(DEWOLF_INSTALL))
+    if decomp.returncode != 0:
+        print(f'{decomp.stdout.decode()}\n{decomp.stderr.decode()}')
+        return
 
-        infile.close()
+    infile.close()
 
-        with open(outfile.name, 'rb') as f:
-            sys.stdout.buffer.write(f.read())
+    with open(outfile.name, 'rb') as f:
+        sys.stdout.buffer.write(f.read())
 
 
 def version():
